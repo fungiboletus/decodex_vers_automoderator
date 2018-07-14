@@ -49,7 +49,7 @@ for siteID, site in sites.items():
   # The ruleID for automoderator
   ruleID = '9'+siteID
 
-  sitesRegexp = ", ".join(map(lambda url: "'%s'" % re.escape(url), urls))
+  sitesRegexp = ", ".join(map(lambda url: "'(^|[^a-z0-9\-])%s'" % re.escape(url), urls))
 
   rule = """---
     # [%(ruleID)s] Decodex %(category)s %(slug)s
@@ -60,7 +60,6 @@ for siteID, site in sites.items():
       L'avis du [DÉCODEX](https://www.lemonde.fr/verification/):
 
       > %(notule)s
-
 """ % {
   'ruleID':      ruleID,
   'category':    category,
