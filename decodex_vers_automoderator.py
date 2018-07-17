@@ -4,12 +4,30 @@ import json
 import re
 
 decodex_url = "https://www.lemonde.fr/webservice/decodex/updates" 
+
+data = {
+  'satirical': {
+    'root_domains': [],
+    'domains_with_sub_path': [],
+    'root_domains_message': "Pour information, {{match}} est satirique et à lire au second degré.",
+    'domains_with_sub_path_message': "Pour information, le contenu du lien posté est satirique et à lire au second degré."
+  },
+  'complotist': {
+    'root_domains': [],
+    'domains_with_sub_path': [],
+    'root_domains_message': "Attention, {{match}} diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'domains_with_sub_path_message': "Attention, le lien posté diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+  },
+  'dubious': {
+    'root_domains': [],
+    'domains_with_sub_path': [],
+    'root_domains_message': "Le lien {{match}} est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'domains_with_sub_path_message': "Le lien posté est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+  }
+}
+
+# Don't know whether the Python will be an ordered dict or not
 categories = ["satirical", "complotist", "dubious"]
-messages = [
-  "Pour information, « %(site_name)s » est un site satirique à lire au second degré.",
-  "Attention, « %(site_name)s » diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
-  "Le site « %(site_name)s » est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
-]
 
 # Load the Decodex Data
 decodex = json.loads(urllib.request.urlopen(decodex_url).read().decode('utf-8'))
@@ -28,6 +46,7 @@ for url, siteID in urls.items():
 
   site[4].append(url)
 
+# Put each site URL into its category
 for siteID, site in sites.items():
   # Site without any URL
   if len(site) < 5:
@@ -35,7 +54,7 @@ for siteID, site in sites.items():
 
   note = min(4, max(1, int(site[0])))
 
-  # Ignore websites which are not a source
+  # Ignore websites which are not a source (such as Reddit)
   if note == 4:
     continue
 
@@ -44,29 +63,53 @@ for siteID, site in sites.items():
   slug = site[3]
   urls = site[4]
   category = categories[note-1]
-  message = messages[note-1] % { 'site_name': site_name }
+  data_category = data[category]
 
   # The ruleID for automoderator
   ruleID = '9'+siteID
 
-  sitesRegexp = ", ".join(map(lambda url: "'(^|[^a-z0-9\-])%s'" % re.escape(url), urls))
+  # Dispatch urls (very beautiful code here)
+  for url in urls:
+    if "/" in url:
+      data_category['domains_with_sub_path'].append(url)
+    else:
+      data_category['root_domains'].append(url)
 
-  rule = """---
-    # [%(ruleID)s] Decodex %(category)s %(slug)s
-    domain+body+title (regex): [%(sitesRegexp)s]
-    comment: |
-      %(message)s
+ruleIDInc = 90
 
-      L'avis du [DÉCODEX](https://www.lemonde.fr/verification/):
+for category in categories:
+  data_category = data[category]
 
-      > %(notule)s
+  for rule_type in ['root_domains', 'domains_with_sub_path', 'body']:
+    if rule_type == 'body':
+      urls = data_category['root_domains'] + data_category['domains_with_sub_path']
+      sites = ", ".join(map(lambda url: "'(^|[^a-z0-9\-])%s'" % re.escape(url), urls))
+      message = data_category['root_domains_message']
+      rule = 'domain+title+body+url (regex)'
+    else:
+      urls = data_category[rule_type]
+      sites = ", ".join(map(lambda url: "'%s'" % url.replace("'","\\'"), urls))
+      message = data_category[rule_type + '_message']
+      rule = 'domain'
+
+    rule = """---
+  # [%(ruleIDInc)s] Decodex %(category)s %(rule_type)s
+  %(rule)s: [%(sites)s]
+  moderators_exempt: false
+  comment: |
+    %(message)s
+
+    [Source Décodex](https://www.lemonde.fr/verification/).
 """ % {
-  'ruleID':      ruleID,
-  'category':    category,
-  'slug':        slug,
-  'sitesRegexp': sitesRegexp,
-  'message':     message,
-  'notule':      notule
-  }
+      'ruleIDInc': ruleIDInc,
+      'category':  category,
+      'slug':      slug,
+      'sites':     sites,
+      'message':   message,
+      'rule_type': rule_type,
+      'rule':      rule
+    }
 
-  print(rule)
+    print(rule)
+
+    ruleIDInc += 1
