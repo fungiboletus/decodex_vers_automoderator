@@ -8,17 +8,17 @@ decodex_url = "https://www.lemonde.fr/webservice/decodex/updates"
 data = {
   'satirical': {
     'urls': [],
-    'message': "Pour information, {{match-3}} est satirique et à lire au second degré.",
+    'message': "Pour information, {{match}} est satirique et à lire au second degré.",
     'report': False,
   },
   'complotist': {
     'urls': [],
-    'message': "Attention, {{match-3}} diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'message': "Attention, {{match}} diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
     'report': True,
   },
   'dubious': {
     'urls': [],
-    'message': "Le lien {{match-3}} est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'message': "Le lien {{match}} est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
     'report': True,
   }
 }
