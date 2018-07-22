@@ -7,22 +7,19 @@ decodex_url = "https://www.lemonde.fr/webservice/decodex/updates"
 
 data = {
   'satirical': {
-    'root_domains': [],
-    'domains_with_sub_path': [],
-    'root_domains_message': "Pour information, {{match}} est satirique et à lire au second degré.",
-    'domains_with_sub_path_message': "Pour information, le contenu du lien posté est satirique et à lire au second degré."
+    'urls': [],
+    'message': "Pour information, {{match-3}} est satirique et à lire au second degré.",
+    'report': False,
   },
   'complotist': {
-    'root_domains': [],
-    'domains_with_sub_path': [],
-    'root_domains_message': "Attention, {{match}} diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
-    'domains_with_sub_path_message': "Attention, le lien posté diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'urls': [],
+    'message': "Attention, {{match-3}} diffuse des fausses actualités. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'report': True,
   },
   'dubious': {
-    'root_domains': [],
-    'domains_with_sub_path': [],
-    'root_domains_message': "Le lien {{match}} est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
-    'domains_with_sub_path_message': "Le lien posté est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'urls': [],
+    'message': "Le lien {{match-3}} est questionnable. Essayez de trouver une autre source ou remontez à l'origine de l'information.",
+    'report': True,
   }
 }
 
@@ -58,58 +55,49 @@ for siteID, site in sites.items():
   if note == 4:
     continue
 
-  notule = site[1]
-  site_name = site[2]
-  slug = site[3]
+  #notule = site[1]
+  #site_name = site[2]
+  #slug = site[3]
   urls = site[4]
   category = categories[note-1]
   data_category = data[category]
 
-  # The ruleID for automoderator
-  ruleID = '9'+siteID
+  # Add URls
+  data_category['urls'] += urls
 
-  # Dispatch urls (very beautiful code here)
-  for url in urls:
-    if "/" in url:
-      data_category['domains_with_sub_path'].append(url)
-    else:
-      data_category['root_domains'].append(url)
-
-ruleIDInc = 90
+ruleIDInc = 30
 
 for category in categories:
   data_category = data[category]
 
-  for rule_type in ['root_domains', 'domains_with_sub_path', 'body']:
-    if rule_type == 'body':
-      urls = data_category['root_domains'] + data_category['domains_with_sub_path']
-      sites = ", ".join(map(lambda url: "'(^|[^a-z0-9\-])%s'" % re.escape(url), urls))
-      message = data_category['root_domains_message']
-      rule = 'domain+title+body+url (regex)'
-    else:
-      urls = data_category[rule_type]
-      sites = ", ".join(map(lambda url: "'%s'" % url.replace("'","\\'"), urls))
-      message = data_category[rule_type + '_message']
-      rule = 'domain'
+  urls = data_category['urls']
+  sites = ", ".join(map(lambda url: "'(^|[^a-z0-9\-])(%s)'" % re.escape(url), urls))
+  message = data_category['message']
 
-    rule = """---
-  # [%(ruleIDInc)s] Decodex %(category)s %(rule_type)s
-  %(rule)s: [%(sites)s]
-  moderators_exempt: false
-  comment: |
-    %(message)s
+  rule = """
+---
 
-    [Source Décodex](https://www.lemonde.fr/verification/).
-""" % {
-      'ruleIDInc': ruleIDInc,
-      'category':  category,
-      'slug':      slug,
-      'sites':     sites,
-      'message':   message,
-      'rule_type': rule_type,
-      'rule':      rule
-    }
+    # [%(ruleIDInc)s] Decodex %(category)s
+    title+body+url (regex): [%(sites)s]
+    moderators_exempt: false"""
 
-    print(rule)
+  if data_category['report']:
+    rule += """
+    action: report
+    action_reason: "Automod [%(ruleIDInc)s]: Decodex %(category)s\""""
 
-    ruleIDInc += 1
+  rule += """
+    comment: |
+      %(message)s
+
+      [Source Décodex](https://www.lemonde.fr/verification/)."""
+
+
+  print(rule % {
+    'ruleIDInc': ruleIDInc,
+    'category':  category,
+    'sites':     sites,
+    'message':   message,
+  })
+
+  ruleIDInc += 1
